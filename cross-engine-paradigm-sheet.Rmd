@@ -27,7 +27,9 @@ This reference table outlines the structural translation layer between tradition
 | **Type Cast** | `as.numeric(col)` | <code>.assign(col3 = lambda df: pd.to_numeric(df["col3"], errors="coerce"))</code> | `.cast(pl.Float64, strict=False)` |
 | **Clean Strings** | `str_to_lower(col)` | <code>.assign(col3 = lambda df: df["col3"].str.lower())</code> | `.with_columns(pl.col("col3").str.to_lowercase())` |
 | **Rename** | `rename_with(~ str_to_lower(str_trim(.)))` | `.rename(columns=lambda c: c.strip().lower())` | <code>.rename({c: c.strip().lower() for c in<br> <span style="color: #d9534f; font-weight: bold;">[DATAFRAME_OBJECT]</span>.collect_schema().names()})</code> |
-| <span style="color: #08519c; font-weight: bold;">Limit Col Length</span> | <code><span style="color: #08519c;">options(pillar.width=40)</span></code> | <code><span style="color: #08519c;">.set_option("display.max_colwidth",25)</span></code> | <code><span style="color: #08519c;">.Config.set_fmt_str_lengths(25)</span></code> |
+| **Row Filtering** | `filter(!mad_thresh(pick(where(is.numeric))))` | <code>.loc[lambda df: ~mad_thresh(df .select_dtypes(include=['float64', 'int64']))]</code> | `.filter(~pl.any_horizontal(mad_thresh_expr(cs.numeric())))` |
+| **Dynamic Column Selection** | `select(where(is.character) | any_of("v_id"))` | `.loc[:, lambda df: df.columns.isin(["v_id"])]` | `.select(cs.string() | pl.col("v_id"))` |
+| <span style="color: #08519c; font-weight: bold;">Limit Column Length</span> | <code><span style="color: #08519c;">options(pillar.width=40)</span></code> | <code><span style="color: #08519c;">.set_option("display.max_colwidth",25)</span></code> | <code><span style="color: #08519c;">.Config.set_fmt_str_lengths(25)</span></code> |
 
 ---
 
@@ -56,3 +58,8 @@ Using `.top_k()` triggers Polars' internal **Heap-Select algorithm**. Instead of
 The internal engine differentiates strictly between mutating a whole dataframe and evaluating a column slice. 
 * If the background parser knows you are modifying a DataFrame/LazyFrame object, your execution environment is safe.
 * If you attempt to edit text downstream of an active, unclosed `pl.col()` expression without assigning it proper structural scope, the engine loses track of its columnar position and will throw an immediate error.
+
+#### 4. Critical Pipeline Gotchas
+
+* **Contagious NaN Values**: Vectorized statistical engines (like `np.median`) propagate `NaN` values across entire arrays. Rule: Always sequence structural drops (`.dropna()`) immediately before calling statistical outlier masks inside the chain to prevent the total collapse of the filter window.
+* **Method Constraints**: Unlike `.loc[]` and `.assign()`, native operations like `.dropna(subset=...)` do not support raw callable inputs. Use explicit external dataframe references when mapping schema masks, or pass the block through a `.pipe()` layer to enforce encapsulation.
