@@ -47,18 +47,18 @@ This reference table outlines the structural translation layer between tradition
 | **Filter Rows** | `filter(col > 50)` | `.query("amount > 50")` | `.filter(pl.col("amount") > 50)` |
 | **Filter Multiple (AND)** | `filter(A > 10, B == "X")` | `.query("A > 10 and B == 'X'")` | `.filter(pl.col("A") > 10, pl.col("B") == "X")` |
 | **Mutate Columns** | `mutate(fee = amt * 0.02)` | `.assign(fee = lambda df: ...)` | `.with_columns(fee = pl.col("amt") * 0.02)` |
-| **Select Columns** | `select(col1, col2)` | <code><span class="matrix-red">[DATAFRAME_OBJECT]</span>[["col1",&nbsp;"col2"]]</code> | `.select("col1", "col2")` |
-| **Select "All BUT" Columns**| `select(!c(col2, col5))` | <code>.loc[:, ~<span class="matrix-red">[DATAFRAME_OBJECT]</span>.columns<br>&nbsp;&nbsp;.isin(["col2",&nbsp;"col5"])]</code> | `.select(pl.all().exclude(["col2", "col5"]))` |
-| **Sort Rows** | `arrange(col1)` | <code>.sort_values(by&nbsp;=&nbsp;"col1")</code> | `.sort("col1")` |
+| **Select Columns** | `select(col1, col2)` | <code><span class="matrix-red">[DATAFRAME_OBJECT]</span>[[&quot;col1&quot;,&nbsp;&quot;col2&quot;]]</code> | `.select("col1", "col2")` |
+| **Select "All BUT" Columns**| `select(!c(col2, col5))` | <code>.loc[:, ~<span class="matrix-red">[DATAFRAME_OBJECT]</span>.columns<br>&nbsp;&nbsp;.isin([&quot;col2&quot;,&nbsp;&quot;col5&quot;])]</code> | `.select(pl.all().exclude(["col2", "col5"]))` |
+| **Sort Rows** | `arrange(col1)` | <code>.sort_values(by&nbsp;=&nbsp;&quot;col1&quot;)</code> | `.sort("col1")` |
 | **Optimize Top Rows** | `slice_max(amt, n = 3)` | `.nlargest(3, "amt")` | `.top_k(3, by = "amt")` |
 | **Group Data** | `group_by(category)` | `.groupby("category")` | `.group_by("category")` |
 | **Aggregate** | `summarise(rev = sum(amt))` | `.agg(rev = ("amt", "sum"))` | `.agg(pl.col("amt").sum().alias("rev"))` |
-| **Type Cast** | `as.numeric(col)` | <code>.assign(col3&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;pd.to_numeric(df["col3"],&nbsp;errors&nbsp;=&nbsp;"coerce"))</code> | `.cast(pl.Float64, strict = False)` |
-| **Clean Strings** | `str_to_lower(col)` | <code>.assign(col3&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;df["col3"].str.lower())</code> | `.with_columns(pl.col("col3").str.to_lowercase())` |
+| **Type Cast** | `as.numeric(col)` | <code>.assign(col3&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;pd.to_numeric(df[&quot;col3&quot;],&nbsp;errors&nbsp;=&nbsp;&quot;coerce&quot;))</code> | `.cast(pl.Float64, strict = False)` |
+| **Clean Strings** | `str_to_lower(col)` | <code>.assign(col3&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;df[&quot;col3&quot;].str.lower())</code> | `.with_columns(pl.col("col3").str.to_lowercase())` |
 | **Rename** | `rename_with(~ str_to_lower(str_trim(.)))` | <code>.rename(columns&nbsp;=&nbsp;lambda&nbsp;c:<br>&nbsp;&nbsp;c.strip().lower())</code> | <code>.rename({c: c.strip().lower() for c in<br>&nbsp;&nbsp;<span class="matrix-red">[DATAFRAME_OBJECT]</span>.collect_schema().names()})</code> |
-| **Row Filtering** | `filter(!mad_thresh(pick(where(is.numeric))))` | <code>.loc[lambda&nbsp;df:&nbsp;~mad_thresh(df<br>&nbsp;&nbsp;.select_dtypes(include&nbsp;=<br>&nbsp;&nbsp;&nbsp;&nbsp;['float64',&nbsp;'int64']))]</code> | `.filter(~pl.any_horizontal(mad_thresh_expr(cs.numeric())))` |
+| **Row Filtering** | `filter(!mad_thresh(pick(where(is.numeric))))` | <code>.loc[lambda&nbsp;df:&nbsp;~mad_thresh(df<br>&nbsp;&nbsp;.select_dtypes(include&nbsp;=<br>&nbsp;&nbsp;&nbsp;&nbsp;[&quot;float64&quot;,&nbsp;&quot;int64&quot;]))]</code> | `.filter(~pl.any_horizontal(mad_thresh_expr(cs.numeric())))` |
 | **Dynamic Column Selection** | `select(where(is.character) | any_of("v_id"))` | `.loc[:, lambda df: df.columns.isin(["v_id"])]` | `.select(cs.string() | pl.col("v_id"))` |
-| <span style="color: #08519c; font-weight: bold;">Limit Column Length</span> | <code><span class="matrix-blue">options(pillar.width&nbsp;=&nbsp;40)</span></code> | <code><span class="matrix-blue">pd.set_option("display.max_colwidth",&nbsp;25)</span></code> | <code><span class="matrix-blue">pl.Config.set_fmt_str_lengths(25)</span></code> |
+| <span style="color: #08519c; font-weight: bold;">Limit Column Length</span> | <code><span class="matrix-blue">options(pillar.width&nbsp;=&nbsp;40)</span></code> | <code><span class="matrix-blue">pd.set_option(&quot;display.max_colwidth&quot;,&nbsp;25)</span></code> | <code><span class="matrix-blue">pl.Config.set_fmt_str_lengths(25)</span></code> |
 | <span style="color: #08519c; font-weight: bold;">**Float / Coordinate Precision**</span> | <code><span class="matrix-blue">options(digits&nbsp;=&nbsp;4)</span></code> | <strong>Pandas:</strong><br><code><span class="matrix-blue">pd.set_option("display.precision",&nbsp;4)</span></code><br><strong>GeoPandas:</strong><br><code><span class="matrix-blue">gpd.options.display_precision&nbsp;=&nbsp;4</span></code> | <code><span class="matrix-blue">pl.Config.set_fmt_float_precision(4)</span></code> |
 
 ---
@@ -67,8 +67,8 @@ This reference table outlines the structural translation layer between tradition
 
 While most of the above syntax are object-agnostic, there are a few above that *do* require a direct reference to the parent object. Such exceptions are listed with the specific parent reference in <span class="matrix-red">[red bold text]</span>. I will also list such exceptions below.
 
-* <code><span class="matrix-red">[DATAFRAME_OBJECT]</span>[["col1","col2"]]</code>
-* <code>.loc[:, ~<span class="matrix-red">[DATAFRAME_OBJECT]</span>.columns.isin(["col2","col5"])]</code>
+* <code><span class="matrix-red">[DATAFRAME_OBJECT]</span>[[&quot;col1&quot;,&nbsp;&quot;col2&quot;]]</code>
+* <code>.loc[:, ~<span class="matrix-red">[DATAFRAME_OBJECT]</span>.columns.isin([&quot;col2&quot;,&nbsp;&quot;col5&quot;])]</code>
 * <code>.rename({c: c.strip().lower() for c in <span class="matrix-red">[DATAFRAME_OBJECT]</span>.collect_schema().names()})</code>
 
 ### Critical Structural Architecture Notes
