@@ -5,43 +5,73 @@ date: "2026-07-17"
 output: 
   html_document:
 ---
+<style>
+/* Normal view on your monitor */
+.matrix-blue {
+  color: #08519c !important;
+}
+.matrix-red {
+  color: #d9534f !important; 
+  font-weight: bold !important;
+}
+
+/* Print-to-PDF view overrides */
+@media print {
+  /* Blue targeting */
+  .matrix-blue, .matrix-blue * {
+    color: #08519c !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Red targeting */
+  .matrix-red, .matrix-red * {
+  color: #d9534f !important; 
+  font-weight: bold !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  }
+}
+</style>
+
 
 
 ## R Tidyverse vs. Python Pandas vs. Python Polars
 
 This reference table outlines the structural translation layer between traditional data manipulation frameworks and modern, high-performance query engines.
 
- > <sub>Note: Operations in <span style="color: #08519c;">blue</span> are global, console operations
+ > <sub>Note: Operations in <span class="matrix-blue">blue</span> are global, console operations
 
 | Operation | R (dplyr / tidyverse) | Pandas Method Chain | Polars Expression Chain |
 | :--- | :--- | :--- | :--- |
 | **Filter Rows** | `filter(col > 50)` | `.query("amount > 50")` | `.filter(pl.col("amount") > 50)` |
 | **Filter Multiple (AND)** | `filter(A > 10, B == "X")` | `.query("A > 10 and B == 'X'")` | `.filter(pl.col("A") > 10, pl.col("B") == "X")` |
 | **Mutate Columns** | `mutate(fee = amt * 0.02)` | `.assign(fee = lambda df: ...)` | `.with_columns(fee = pl.col("amt") * 0.02)` |
-| **Select Columns** | `select(col1, col2)` | <code><span style="color: #d9534f; font-weight: bold;">[DATAFRAME_OBJECT]</span>[["col1","col2"]]</code> | `.select("col1", "col2")` |
-| **Select "All BUT" Columns**| `select(!c(col2, col5))` | <code>.loc[:, ~<span style="color: #d9534f; font-weight: bold;">[DATAFRAME_OBJECT]</span>.columns<br>.isin(["col2","col5"])]</code> | `.select(pl.all().exclude(["col2", "col5"]))` |
-| **Sort Rows** | `arrange(col1)` | `.sort_values(by="col1")` | `.sort("col1")` |
-| **Optimize Top Rows** | `slice_max(amt, n=3)` | `.nlargest(3, "amt")` | `.top_k(3, by="amt")` |
+| **Select Columns** | `select(col1, col2)` | <code><span class="matrix-red">[DATAFRAME_OBJECT]</span>[["col1",&nbsp;"col2"]]</code> | `.select("col1", "col2")` |
+| **Select "All BUT" Columns**| `select(!c(col2, col5))` | <code>.loc[:, ~<span class="matrix-red">[DATAFRAME_OBJECT]</span>.columns<br>&nbsp;&nbsp;.isin(["col2",&nbsp;"col5"])]</code> | `.select(pl.all().exclude(["col2", "col5"]))` |
+| **Sort Rows** | `arrange(col1)` | <code>.sort_values(by&nbsp;=&nbsp;"col1")</code> | `.sort("col1")` |
+| **Optimize Top Rows** | `slice_max(amt, n = 3)` | `.nlargest(3, "amt")` | `.top_k(3, by = "amt")` |
 | **Group Data** | `group_by(category)` | `.groupby("category")` | `.group_by("category")` |
-| **Aggregate** | `summarise(rev = sum(amt))` | `.agg(rev=("amt", "sum"))` | `.agg(pl.col("amt").sum().alias("rev"))` |
-| **Type Cast** | `as.numeric(col)` | <code>.assign(col3 = lambda df: pd.to_numeric(df["col3"], errors="coerce"))</code> | `.cast(pl.Float64, strict=False)` |
-| **Clean Strings** | `str_to_lower(col)` | <code>.assign(col3 = lambda df: df["col3"].str.lower())</code> | `.with_columns(pl.col("col3").str.to_lowercase())` |
-| **Rename** | `rename_with(~ str_to_lower(str_trim(.)))` | `.rename(columns=lambda c: c.strip().lower())` | <code>.rename({c: c.strip().lower() for c in<br> <span style="color: #d9534f; font-weight: bold;">[DATAFRAME_OBJECT]</span>.collect_schema().names()})</code> |
-| **Row Filtering** | `filter(!mad_thresh(pick(where(is.numeric))))` | <code>.loc[lambda df: ~mad_thresh(df .select_dtypes(include=['float64', 'int64']))]</code> | `.filter(~pl.any_horizontal(mad_thresh_expr(cs.numeric())))` |
+| **Aggregate** | `summarise(rev = sum(amt))` | `.agg(rev = ("amt", "sum"))` | `.agg(pl.col("amt").sum().alias("rev"))` |
+| **Type Cast** | `as.numeric(col)` | <code>.assign(col3&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;pd.to_numeric(df["col3"],&nbsp;errors&nbsp;=&nbsp;"coerce"))</code> | `.cast(pl.Float64, strict = False)` |
+| **Clean Strings** | `str_to_lower(col)` | <code>.assign(col3&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;df["col3"].str.lower())</code> | `.with_columns(pl.col("col3").str.to_lowercase())` |
+| **Rename** | `rename_with(~ str_to_lower(str_trim(.)))` | <code>.rename(columns&nbsp;=&nbsp;lambda&nbsp;c:<br>&nbsp;&nbsp;c.strip().lower())</code> | <code>.rename({c: c.strip().lower() for c in<br>&nbsp;&nbsp;<span class="matrix-red">[DATAFRAME_OBJECT]</span>.collect_schema().names()})</code> |
+| **Row Filtering** | `filter(!mad_thresh(pick(where(is.numeric))))` | <code>.loc[lambda&nbsp;df:&nbsp;~mad_thresh(df<br>&nbsp;&nbsp;.select_dtypes(include&nbsp;=<br>&nbsp;&nbsp;&nbsp;&nbsp;['float64',&nbsp;'int64']))]</code> | `.filter(~pl.any_horizontal(mad_thresh_expr(cs.numeric())))` |
 | **Dynamic Column Selection** | `select(where(is.character) | any_of("v_id"))` | `.loc[:, lambda df: df.columns.isin(["v_id"])]` | `.select(cs.string() | pl.col("v_id"))` |
-| <span style="color: #08519c; font-weight: bold;">Limit Column Length</span> | <code><span style="color: #08519c;">options(pillar.width=40)</span></code> | <code><span style="color: #08519c;">.set_option("display.max_colwidth",25)</span></code> | <code><span style="color: #08519c;">.Config.set_fmt_str_lengths(25)</span></code> |
+| <span style="color: #08519c; font-weight: bold;">Limit Column Length</span> | <code><span class="matrix-blue">options(pillar.width&nbsp;=&nbsp;40)</span></code> | <code><span class="matrix-blue">pd.set_option("display.max_colwidth",&nbsp;25)</span></code> | <code><span class="matrix-blue">pl.Config.set_fmt_str_lengths(25)</span></code> |
+| <span style="color: #08519c; font-weight: bold;">**Float / Coordinate Precision**</span> | <code><span class="matrix-blue">options(digits&nbsp;=&nbsp;4)</span></code> | <strong>Pandas:</strong><br><code><span class="matrix-blue">pd.set_option("display.precision",&nbsp;4)</span></code><br><strong>GeoPandas:</strong><br><code><span class="matrix-blue">gpd.options.display_precision&nbsp;=&nbsp;4</span></code> | <code><span class="matrix-blue">pl.Config.set_fmt_float_precision(4)</span></code> |
 
 ---
 
 ### Object Dependency & Expressive Coupling
 
-While most of the above syntax are object-agnostic, there are a few above that *do* require a direct reference to the parent object. Such exceptions are listed with the specific parent reference in <span style="color: #d9534f; font-weight: bold;">[red bold text]</span>. I will also list such exceptions below.
+While most of the above syntax are object-agnostic, there are a few above that *do* require a direct reference to the parent object. Such exceptions are listed with the specific parent reference in <span class="matrix-red">[red bold text]</span>. I will also list such exceptions below.
 
-* <code><span style="color: #d9534f; font-weight: bold;">[DATAFRAME_OBJECT]</span>[["col1","col2"]]</code>
-* <code>.loc[:, ~<span style="color: #d9534f; font-weight: bold;">[DATAFRAME_OBJECT]</span>.columns.isin(["col2","col5"])]</code>
-* <code>.rename({c: c.strip().lower() for c in <span style="color: #d9534f; font-weight: bold;">[DATAFRAME_OBJECT]</span>.collect_schema().names()})</code>
+* <code><span class="matrix-red">[DATAFRAME_OBJECT]</span>[["col1","col2"]]</code>
+* <code>.loc[:, ~<span class="matrix-red">[DATAFRAME_OBJECT]</span>.columns.isin(["col2","col5"])]</code>
+* <code>.rename({c: c.strip().lower() for c in <span class="matrix-red">[DATAFRAME_OBJECT]</span>.collect_schema().names()})</code>
 
-### 🧠 Critical Structural Architecture Notes
+### Critical Structural Architecture Notes
 
 #### 1. The Polars Multi-Argument Shortcut (Dropping `[...]`)
 In both `.filter()` and `.agg()`, Polars allows you to completely drop Python list brackets `[...]` and pass expressions as simple comma-separated arguments. 
