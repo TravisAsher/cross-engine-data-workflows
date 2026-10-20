@@ -1,9 +1,10 @@
 ---
 title: "The Master Data Engineering Paradigm"
 author: "Travis Asher"
-date: "2026-07-17"
+date: "`r Sys.Date()`"
 output: 
   html_document:
+  pdf_document:
 ---
 <style>
 /* Normal view on your monitor */
@@ -53,15 +54,30 @@ This reference table outlines the structural translation layer between tradition
 | **Optimize Top Rows** | `slice_max(amt, n = 3)` | `.nlargest(3, "amt")` | `.top_k(3, by = "amt")` |
 | **Group Data** | `group_by(category)` | `.groupby("category")` | `.group_by("category")` |
 | **Aggregate** | `summarise(rev = sum(amt))` | `.agg(rev = ("amt", "sum"))` | `.agg(pl.col("amt").sum().alias("rev"))` |
-| **Type Cast** | `as.numeric(col)` | <code>.assign(col3&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;pd.to_numeric(df[&quot;col3&quot;],&nbsp;errors&nbsp;=&nbsp;&quot;coerce&quot;))</code> | `.cast(pl.Float64, strict = False)` |
-| **Clean Strings** | `str_to_lower(col)` | <code>.assign(col3&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;df[&quot;col3&quot;].str.lower())</code> | `.with_columns(pl.col("col3").str.to_lowercase())` |
+| **Type Cast** | `mutate(col = as.numeric(col))` | <code>.assign(col3&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;pd.to_numeric(df[&quot;col3&quot;],<br>&nbsp;&nbsp;&nbsp;errors&nbsp;=&nbsp;&quot;coerce&quot;))</code> | `.cast(pl.Float64, strict = False)` |
+| **Clean Strings** | `mutate(col = str_to_lower(col))` | <code>.assign(col3&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;df[&quot;col3&quot;].str.lower())</code> | `.with_columns(pl.col("col3").str.to_lowercase())` |
 | **Rename** | `rename_with(~ str_to_lower(str_trim(.)))` | <code>.rename(columns&nbsp;=&nbsp;lambda&nbsp;c:<br>&nbsp;&nbsp;c.strip().lower())</code> | <code>.rename({c: c.strip().lower() for c in<br>&nbsp;&nbsp;<span class="matrix-red">[DATAFRAME_OBJECT]</span>.collect_schema().names()})</code> |
-| **Row Filtering** | `filter(!mad_thresh(pick(where(is.numeric))))` | <code>.loc[lambda&nbsp;df:&nbsp;~mad_thresh(df<br>&nbsp;&nbsp;.select_dtypes(include&nbsp;=<br>&nbsp;&nbsp;&nbsp;&nbsp;[&quot;float64&quot;,&nbsp;&quot;int64&quot;]))]</code> | `.filter(~pl.any_horizontal(mad_thresh_expr(cs.numeric())))` |
-| **Dynamic Column Selection** | `select(where(is.character) | any_of("v_id"))` | `.loc[:, lambda df: df.columns.isin(["v_id"])]` | `.select(cs.string() | pl.col("v_id"))` |
-| <span style="color: #08519c; font-weight: bold;">Limit Column Length</span> | <code><span class="matrix-blue">options(pillar.width&nbsp;=&nbsp;40)</span></code> | <code><span class="matrix-blue">pd.set_option(&quot;display.max_colwidth&quot;,&nbsp;25)</span></code> | <code><span class="matrix-blue">pl.Config.set_fmt_str_lengths(25)</span></code> |
-| <span style="color: #08519c; font-weight: bold;">**Float / Coordinate Precision**</span> | <code><span class="matrix-blue">options(digits&nbsp;=&nbsp;4)</span></code> | <strong>Pandas:</strong><br><code><span class="matrix-blue">pd.set_option("display.precision",&nbsp;4)</span></code><br><strong>GeoPandas:</strong><br><code><span class="matrix-blue">gpd.options.display_precision&nbsp;=&nbsp;4</span></code> | <code><span class="matrix-blue">pl.Config.set_fmt_float_precision(4)</span></code> |
+| **Conditional Assignment: Columns** | <code>mutate(col&nbsp;=&nbsp;if_else(<br>&nbsp;&nbsp;A&nbsp;>&nbsp;50,&nbsp;"High",&nbsp;"Low"))</code> | <code>.assign(col&nbsp;=&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;np.where(df[&quot;A&quot;]&nbsp;>&nbsp;50,&nbsp;&quot;High&quot;,&nbsp;&quot;Low&quot;))</code> | <code>.with_columns(col&nbsp;=&nbsp;pl.when(pl.col(&quot;A&quot;)&nbsp;>&nbsp;50)<br>&nbsp;&nbsp;.then(pl.lit(&quot;High&quot;))<br>&nbsp;&nbsp;&nbsp;&nbsp;.otherwise(pl.lit(&quot;Low&quot;)))</code> |
+| **Conditional Reassignment: Global** | <code>mutate(across(everything(),&nbsp;&#x5C;(entry)&nbsp;<br>&nbsp;&nbsp;if_else(entry&nbsp;==&nbsp;-99,&nbsp;NA,&nbsp;entry)))</code><br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="matrix-red"><sub>*See note in "Object Dependency"</span> | `.mask(lambda x: x == -99, np.nan)` | <code>.with_columns(pl.all().when(pl.all()&nbsp;==&nbsp;-99)<br>&nbsp;&nbsp;.then(None).otherwise(pl.all()))</code> |
+| **Row Filtering** | <code>filter(!mad_thresh(pick(<br>&nbsp;&nbsp;where(is.numeric))))</code> | <code>.loc[lambda&nbsp;df:&nbsp;~mad_thresh(df<br>&nbsp;&nbsp;.select_dtypes(include&nbsp;=<br>&nbsp;&nbsp;&nbsp;&nbsp;[&quot;float64&quot;,&nbsp;&quot;int64&quot;]))]</code> | <code>.filter(~pl.any_horizontal(<br>&nbsp;&nbsp;mad_thresh(cs.numeric())))</code> |
+| **Dynamic Column Selection** <br><sub>*(Filter layout by data types/selectors)* | <code>select(where(is.character)&nbsp;&#x7C;<br>&nbsp;&nbsp;any_of("v_id"))</code> | <code>.loc[:,&nbsp;lambda&nbsp;df:<br>&nbsp;&nbsp;df.columns.isin(["v_id"])]</code> | <code>.select(cs.string()&nbsp;&#x7C;&nbsp;<br>&nbsp;&nbsp;pl.col("v_id"))</code> |
+| **Function Parameter Injection** <br><sub>*(Pass specific column name into custom tools)* | `mutate(new = {{ col_var }})` | `.with_columns(pl.col(col_var))` | `.assign(new = lambda x: x[col_var])` |
+| <span class="matrix-blue">**Limit Column Length**</span> | <code><span class="matrix-blue">options(pillar.width&nbsp;=&nbsp;100)</span></code> | <code><span class="matrix-blue">pd.set_option(&quot;display.max_colwidth&quot;,&nbsp;25)</span></code> | <code><span class="matrix-blue">pl.Config.set_fmt_str_lengths(25)</span></code> |
+| <span class="matrix-blue">**Float / Coordinate Precision**</span> | <code><span class="matrix-blue">options(digits&nbsp;=&nbsp;4)</span></code> | <strong>Pandas:</strong><br><code><span class="matrix-blue">pd.set_option("display.precision",&nbsp;4)</span></code><br><strong>GeoPandas:</strong><br><code><span class="matrix-blue">gpd.options.display_precision&nbsp;=&nbsp;4</span></code> | <code><span class="matrix-blue">pl.Config.set_fmt_float_precision(4)</span></code> |
 
 ---
+
+### Multi-Engine Type Casting Alignment
+
+While some operations have a global scope and can either be piped (R) or accessed as a dataframe method (Python) directly, others must be directed using either a scoping function (R) or a specific object/class-method invocation (Python). The general syntax for how to deal with these operations that require further direction are listed below.
+
+
+| Engine | Pipeline Syntax | Scope Handler | Vector Function |
+| :--- | :--- | :--- | :--- |
+| **R (Tidyverse)** | `df |> mutate(col = str_to_lower(col))` | `mutate()` opens the data frame | `str_to_lower()` transforms the vector |
+| **Python (Pandas)** | `df.assign(col = df["col"].str.lower())` | `.assign()` evaluates key-words | `.str.lower()` transforms the Series | 
+| **Python (Polars)** | `df.with_columns(pl.col("col").str.to_lowercase())` | `.with_columns()` opens the context | `.str.to_lowercase()` transforms the expression |
+
 
 ### Object Dependency & Expressive Coupling
 
@@ -70,6 +86,9 @@ While most of the above syntax are object-agnostic, there are a few above that *
 * <code><span class="matrix-red">[DATAFRAME_OBJECT]</span>[[&quot;col1&quot;,&nbsp;&quot;col2&quot;]]</code>
 * <code>.loc[:, ~<span class="matrix-red">[DATAFRAME_OBJECT]</span>.columns.isin([&quot;col2&quot;,&nbsp;&quot;col5&quot;])]</code>
 * <code>.rename({c: c.strip().lower() for c in <span class="matrix-red">[DATAFRAME_OBJECT]</span>.collect_schema().names()})</code>
+* *Alternative R syntax for  "Conditional Assignment: Global": <code><span class="matrix-red">[DATAFRAME_OBJECT]</span>[<span class="matrix-red">[DATAFRAME_OBJECT]</span>&nbsp;==&nbsp;-99]&nbsp;<-&nbsp;NA</code>
+
+
 
 ### Critical Structural Architecture Notes
 
@@ -89,7 +108,7 @@ The internal engine differentiates strictly between mutating a whole dataframe a
 * If the background parser knows you are modifying a DataFrame/LazyFrame object, your execution environment is safe.
 * If you attempt to edit text downstream of an active, unclosed `pl.col()` expression without assigning it proper structural scope, the engine loses track of its columnar position and will throw an immediate error.
 
-#### 4. Critical Pipeline Gotchas
+#### 4. Critical Pipeline "Gotchas"
 
 * **Contagious NaN Values**: Vectorized statistical engines (like `np.median`) propagate `NaN` values across entire arrays. Rule: Always sequence structural drops (`.dropna()`) immediately before calling statistical outlier masks inside the chain to prevent the total collapse of the filter window.
 * **Method Constraints**: Unlike `.loc[]` and `.assign()`, native operations like `.dropna(subset=...)` do not support raw callable inputs. Use explicit external dataframe references when mapping schema masks, or pass the block through a `.pipe()` layer to enforce encapsulation.
